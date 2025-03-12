@@ -1,1 +1,50 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "your-dockerhub-username/your-app"  // Change this to your Docker Hub repo
+        EC2_USER = "ec2-user"  // Change based on your EC2 instance (e.g., ubuntu for Ubuntu)
+        EC2_IP = "your-ec2-ip"  // Replace with your EC2 public IP
+        PRIVATE_KEY = "/path/to/your-private-key.pem"  // Path to your SSH key
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git 'https://github.com/your-repo.git'  // Replace with your repo URL
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE} ."
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withDockerRegistry([credentialsId: 'docker-hub-credentials', url: '']) {
+                    sh "docker push ${DOCKER_IMAGE}"
+                }
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                script {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no -i ${PRIVATE_KEY} ${EC2_USER}@${EC2_IP} << EOF
+                        docker stop my-container || true
+                        docker rm my-container || true
+                        docker pull ${DOCKER_IMAGE}
+                        docker run -d -p 8000:8000 --name my-container ${DOCKER_IMAGE}
+                    EOF
+                    """
+                }
+            }
+        }
+    }
+}
 
