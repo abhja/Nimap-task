@@ -2,16 +2,13 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "your-dockerhub-username/your-app"  // Change this to your Docker Hub repo
-        EC2_USER = "ec2-user"  // Change based on your EC2 instance (e.g., ubuntu for Ubuntu)
-        EC2_IP = "your-ec2-ip"  // Replace with your EC2 public IP
-        PRIVATE_KEY = "/path/to/your-private-key.pem"  // Path to your SSH key
+        DOCKER_IMAGE = "akhilagrawal206767/your-app"
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/your-repo.git'  // Replace with your repo URL
+                git 'https://github.com/abhja/Nimap-task.git'  // Replace with your repo URL
             }
         }
 
@@ -33,18 +30,23 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                script {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no -i ${PRIVATE_KEY} ${EC2_USER}@${EC2_IP} << EOF
-                        docker stop my-container || true
-                        docker rm my-container || true
-                        docker pull ${DOCKER_IMAGE}
-                        docker run -d -p 8000:8000 --name my-container ${DOCKER_IMAGE}
-                    EOF
-                    """
+                withCredentials([
+                    sshUserPrivateKey(credentialsId: 'ec2-private-key', keyFileVariable: 'SSH_KEY'),
+                    string(credentialsId: 'ec2-ip', variable: 'EC2_IP'),
+                    string(credentialsId: 'ec2-user', variable: 'EC2_USER')
+                ]) {
+                    script {
+                        sh """
+                        ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ${EC2_USER}@${EC2_IP} << EOF
+                            docker stop my-container || true
+                            docker rm my-container || true
+                            docker pull ${DOCKER_IMAGE}
+                            docker run -d -p 8000:8000 --name my-container ${DOCKER_IMAGE}
+                        EOF
+                        """
+                    }
                 }
             }
         }
     }
 }
-
